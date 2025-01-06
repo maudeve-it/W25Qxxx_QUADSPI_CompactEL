@@ -1,3 +1,10 @@
+<img src="[https://github.com/maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C/blob/main/Immagine%202023-03-20%20104231.png](https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/COPERTINA%20QSPI.png)" width="745" height="425">
+
+
+
+<br>
+<br>
+
 **Piu' sotto, al termine della lingua inglese trovi il testo in italiano. </i>**_
 _**<br>Below the English text you'll find the Italian version</i>**_
 <br>
