@@ -1,0 +1,1 @@
+# W25Qxxx_QUADSPI_CompactEL
