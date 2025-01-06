@@ -1,4 +1,4 @@
-<img src="https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/COPERTINA%20QSPI.png" width="745" height="419">
+<img src="https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/COPERTINA%20QSPI.png" width="900" height="506">
 
 
 
