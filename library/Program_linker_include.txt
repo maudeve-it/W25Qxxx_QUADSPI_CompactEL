@@ -1,0 +1,35 @@
+
+
+/* add this line to the memory configuration of the linker script */
+/* update LENGTH field indicating the size of flash */
+
+  QSPI_FLASH (r)    : ORIGIN = 0x90000000,  LENGTH = 1M 
+
+
+
+/* copy the two below section declarations to the SECTION area of the linker scritpt */
+/* if using TouchGFX you'll need both declarations, otherwise you could only use ExtFlashSection */
+
+  ExtFlashSection :
+  {
+	*(ExtFlashSection ExtFlashSection.*)
+	*(-gnu-linkonce.r.*)
+    . = ALIGN(0x100);
+  } >QSPI_FLASH
+
+
+
+  FontFlashSection :
+  {
+	*(FontFlashSection FontFlashSection.*)
+	*(-gnu-linkonce.r.*)
+    . = ALIGN(0x100);
+  } >QSPI_FLASH
+
+
+
+
+/* attributes for variables declaration */
+/* __attribute__((section("ExtFlashSection"))) __attribute__((aligned(4))) */
+/* alternative */
+/* ON_EXT_FLASH */
