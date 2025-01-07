@@ -182,7 +182,7 @@ ecc.<br>
 <ul>
 <li> configura una porta <b>QuadSPI</b> per la memoria flash, seguendo il tuo progetto<br>
 <i><b>Attenzione:</b><br>
-E' sempre consigliabile configurare una velocià ridotta (es. inferiore a 2Mbit/s)<br>
+E' sempre consigliabile configurare una velocià ridotta (es. inferiore a 2Mbit/s)</i><br>
 <li> abilita <b>CRC</b> (devi solo spuntare "Activated")<br>
 <li> Se hai un led a disposizione sulla scheda, puoi usarlo nell'External Loader (utile nel troubleshooting)<br>
 dai al pin del led il nome: <b>LED</b> 
