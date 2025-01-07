@@ -138,10 +138,8 @@ once in the STM32CubeProgrammer program folder go subfolder:
 
 <li>
 copy here the External Loader created (.stldr file)<br><br>
-Opening STM32CubeProgrammer program you can select the new External Loader to access the external flash memory.
 </ul>
 <br>
-Copy here the new .stldr file<br><br>
 Now the External Loader is available to CubeIDE and can be selected in "Run/Debug Settings"<br>
 <br>
 <br>
