@@ -5,12 +5,12 @@ _**<br>Below the English text you'll find the Italian version</i>**_
 <br>
 
 # 2) Creating a <i>low-RAM-demanding</i> EXTERNAL LOADER for STM32CubeProgrammer and STM32CubeIDE
-External Loader is a plug-in for STM32CubeProgrammer allowing to read/write an external memory through an STM32 uC.<br>
-Following the below instruction you can create an External Loader for a W25Q connected to a QuadSPI adding it then to CubeProgrammer and CubeIDE.<br>
+External Loader is a plug-in for STM32CubeProgrammer/CubeIDE allowing to read/write an external memory through an STM32 uC.<br>
+Following the below instruction you can create an External Loader for a W25Q connected to a QuadSPI, adding it then to CubeProgrammer and CubeIDE.<br>
 
 ## "How to" create an External Loader for a specific project:
 <ul>
-After defining the CubeMX configuration details of your project with a flash memory via QuadSPI (e.g., having already set the QuadSPI mode and other necessary details for managing the flash memory)<br><br>
+After defining the CubeMX configuration details of your project with a flash memory via QuadSPI (e.g., having already set the QuadSPI mode and other details for managing the flash memory)<br><br>
 <li><b>Create a new project in CubeIDE</b>.<br>
 Give the project a name with this format:<br> 
 "external flash used"_"uC or board name"_"oprional: other info, if any, - e.g. QSPI port, mode, bank, etc."<br>
@@ -23,7 +23,7 @@ etc.<br>
 </ul>
 <li><b>in CubeMX</b>:
 <ul>
-<li> setup the <b>QuadSPI port</b> for your flash memory, as per youe project<br>
+<li> setup the <b>QuadSPI port</b> for your flash memory, as per youe project.<br>
 <i><b>Warning:</b><br>
 I always recommend to setup the External Loader with a low QuadSPI port speed (e.g. lower than 2Mbit/s)</i><br>
 <li> enable <b>CRC</b> (you just need to set "Activated" checkbox)<br>
@@ -182,7 +182,7 @@ ecc.<br>
 <ul>
 <li> configura una porta <b>QuadSPI</b> per la memoria flash, seguendo il tuo progetto<br>
 <i><b>Attenzione:</b><br>
-E' sempre consigliabile configurare una velocià ridotta (es. inferiore a 2Mbit/s)</i><br>
+E' sempre consigliabile configurare una velocià ridotta in un External Loader (es. inferiore a 2Mbit/s)</i><br>
 <li> abilita <b>CRC</b> (devi solo spuntare "Activated")<br>
 <li> Se hai un led a disposizione sulla scheda, puoi usarlo nell'External Loader (utile nel troubleshooting)<br>
 dai al pin del led il nome: <b>LED</b> 
@@ -213,7 +213,7 @@ Post-Build command.txt<br>
 <li>
 definire i parametri in <i>"<b>z_qflash_W25QXXX.h</b>"</i>
 <ul>
-definire le caratteristiche della memoria (vedi piu' sopra la configurazione di <i>"z_flash_W25QXXX.h"</i> da Step 1 a 4)
+definire le caratteristiche della memoria (vedi piu' sopra la configurazione di <i>"z_qflash_W25QXXX.h"</i> da Step 1 a 4)
 </ul>
 <li>
 configurare <i><b>Loader_Src.c</b></i>:
