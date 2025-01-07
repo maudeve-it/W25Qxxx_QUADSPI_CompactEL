@@ -107,8 +107,8 @@ in <i><b>project->properties->C/C++ Build->settings->Tool Setting->MCU GCC Linke
 <br>
 
 
-> <br><em><b>PLEASE NOTE:</b><br> This is a "compact" version of EL: you don't need to unmark flag <i><b>Discard Unused Sections</b></i> in Project->Properties as indicated in my youtube video "[Part One](https://youtu.be/KlG2doCkREM)".<br>
-> Characteristics and needs of this library are described in "[Part Two](https://youtu.be/zv0w_vhTTTo)".<br>
+> <em><b>PLEASE NOTE:</b><br> This is a "compact" version of EL: you don't need to unmark flag <i><b>Discard Unused Sections</b></i> in Project->Properties as indicated in my youtube video "[Part One](https://youtu.be/KlG2doCkREM)".<br>
+> Characteristics and needs of this library are described in "[Part Two](https://youtu.be/zv0w_vhTTTo)".<br></em>
 
 <br>
 
