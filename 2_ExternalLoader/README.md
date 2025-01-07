@@ -295,13 +295,9 @@ Raggiunta la cartella di STM32CubeIDE, andare nella sottocartella:
 <i>./plugins/xxxxxx.externaltools.cubeprogrammer.xxxxx/tools/bin/ExternalLoader</i><br>
 <li>
 Copiare qui il file .stldr creato<br><br>
-Ora l'External Loader è disponibile in CubeIDE e puo' essere selezionato in "Run/Debug Settings"<br>
+Ora l'External Loader è disponibile in CubeIDE e puo' essere selezionato in "Run/Debug Settings" in Project->Properties<br>
 </ul>
 
-<br>
-Vedi la pagina "How to: come aggiungere un  External Loader a STM32CubeProgrammer"
-e "How to: configurare un progetto STM32CubeIDE mappando una memoria flash esterna"
-<br><i><b>
 <br>
 
 [Torna alla home page](../.)
