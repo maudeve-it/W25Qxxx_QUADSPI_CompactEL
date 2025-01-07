@@ -265,7 +265,7 @@ in <i><b>project->properties->C/C++ Build->settings->Tool Setting->MCU GCC Linke
 
 
 > <br><em><b>NOTA BENE:</b><br> Non hai bisogno di deselezionare il flag <i><b>Discard Unused Sections</b></i> in Project->Properties, come indicato nel mio video "[Prima Parte](https://youtu.be/KlG2doCkREM)".<br>
-> Le caratteristiche e le necessità di questa libreria sono descritte in "[Terza Seconda](https://youtu.be/zv0w_vhTTTo)".<br>
+> Le caratteristiche e le necessità di questa libreria sono descritte in "[Seconda Parte](https://youtu.be/zv0w_vhTTTo)"</em>.<br>
 
 <br>
 
