@@ -6,28 +6,26 @@ _**<br>Below the English text you'll find the Italian version</i>**_
 
 # 2) Creating a <i>low-RAM-demanding</i> EXTERNAL LOADER for STM32CubeProgrammer and STM32CubeIDE
 External Loader is a plug-in for STM32CubeProgrammer allowing to read/write an external memory through an STM32 uC.<br>
-Through the library shown above it is possible to create an External Loader for an STM32 project having a Winbond external QuadSPI Flash chip .<br>
-Next, you will see how you can use the same external loader program in STM32CubeIDE to program external Flash memory directly while creating a project: CubeIDE uses the CubeProgrammer modules to program uC internal and external flash memory.  
+Following the below instruction you can create an External Loader for a W25Q connected to a QuadSPI adding it then to CubeProgrammer and CubeIDE.<br>
 
 ## "How to" create an External Loader for a specific project:
 <ul>
-Supposing you already defined the project configuration having an external flash memory (e.g. having defined the QuadSPI mode and other details needed to communicate with Flash memory...)<br><br>
+After defining the CubeMX configuration details of your project with a flash memory via QuadSPI (e.g., having already set the QuadSPI mode and other necessary details for managing the flash memory)<br><br>
 <li><b>Create a new project in CubeIDE</b>.<br>
 Give the project a name with this format:<br> 
-"external flash used"_"uC or board name"_"other info, if any, - e.g. QSPI port, mode, bank, etc."<br>
+"external flash used"_"uC or board name"_"oprional: other info, if any, - e.g. QSPI port, mode, bank, etc."<br>
 (having character "_" dividing the three fields, must non be used elsewhere)<br>
 Here some examples for a valid project name:
 <ul>
 W25Q80_STM32F411_QSPI-BANK1<br>
 W25Q80_WEACT-H750 (third field is optional and here it is not used)<br>
-W25Q64_NUCLEO32-L432_SPI1-PA4CS<br>
 etc.<br>
 </ul>
 <li><b>in CubeMX</b>:
 <ul>
-<li> setup the <b>SPI port</b> and the <b>CS pin</b> for your flash memory. (see above details about SPI port configuration on CubeMX)<br>
+<li> setup the <b>QuadSPI port</b> for your flash memory, as per youe project<br>
 <i><b>Warning:</b><br>
-if prototyping with a flash on a breakout board, I recommend you to setup the External Loader with an SPI port speed lower than 2Mbit/s</i><br>
+I always recommend to setup the External Loader with a low QuadSPI port speed (e.g. lower than 2Mbit/s)</i><br>
 <li> enable <b>CRC</b> (you just need to set "Activated" checkbox)<br>
 <li> If on your board, you have available a led connected to a uC pin (GPIO_Output): you can use it in the External Loader. Useful for troubleshooting.<br>
 give the uC led pin the name: <b>LED</b>.<br>
@@ -39,13 +37,13 @@ give the uC led pin the name: <b>LED</b>.<br>
 <li>
 in <i><b>include</b></i> folder, copy files:
 <ul>
-z_flash_W25QXXX.h<br>
+z_qflash_W25QXXX.h<br>
 Dev_Inf.h<br>
 </ul>
 <li>
 in <i><b>src</b></i> folder, copy files:
 <ul>
-z_flash_W25QXXX.c<br>
+z_qflash_W25QXXX.c<br>
 Dev_Inf.c<br>
 Loader_Src.c<br>
 </ul>
@@ -56,7 +54,7 @@ EL_linker.ld<br>
 Post-Build command.txt<br>
 </ul>
 <li>
-Setup <i>"<b>z_flash_W25QXXX.h</b>"</i>
+Setup <i>"<b>z_qflash_W25QXXX.h</b>"</i>
 <ul>
 registering flash chip characteristics (see above the setup of <i>"z_flash_W25QXXX.h"</i> Step 1 to 4)
 </ul>
@@ -83,7 +81,7 @@ click "Apply and Close"
 edit <i><b>EL_linker.ld</b></i> 
 <ul>
 <li>
-set the memory size as per uC available RAM:<br>
+set the memory origin and size as per uC available RAM:<br>
 around line 30 you find text:<br>
 	
 ```sh
@@ -93,7 +91,8 @@ RAM_LOADER (xrw)      : ORIGIN = 0x20000004, LENGTH = 8M-4
 ...
 ```
 <br>
-change value "8M" after "LENGTH =" indicating the uC RAM size
+change value "0x20000004" to "0x24000004" if using an H7 uC<br>
+change value "8M" after "LENGTH =" indicating the uC RAM size (refer to the current active .ld file for correct information about the RAM configuration of your uC)<br>
 <li>
 save changes
 <li>
@@ -108,8 +107,8 @@ in <i><b>project->properties->C/C++ Build->settings->Tool Setting->MCU GCC Linke
 <br>
 
 
-> <br><em><b>PLEASE NOTE:</b><br> You don't need to unmark flag <i><b>Discard Unused Sections</b></i> in Project->Properties as indicated in my youtube video "[Part One](https://youtu.be/KlG2doCkREM)".<br>
-> Characteristics and needs of this library are described in "[Part Two](.)".<br>
+> <br><em><b>PLEASE NOTE:</b><br> This is a "compact" version of EL: you don't need to unmark flag <i><b>Discard Unused Sections</b></i> in Project->Properties as indicated in my youtube video "[Part One](https://youtu.be/KlG2doCkREM)".<br>
+> Characteristics and needs of this library are described in "[Part Two](https://youtu.be/zv0w_vhTTTo)".<br>
 
 <br>
 
@@ -117,7 +116,6 @@ Now "Compile" project: If everithing goes fine <b>you'll find the file <i>projec
 THIS IS THE EXTERNAL LOADER<br><br>
 
 ## "How to" add External Loader to STM32CubeProgrammer
-
 <ul>
 <li>
 Go to the STM32CubeProgrammer program folder<br> 
@@ -130,9 +128,21 @@ Opening STM32CubeProgrammer program you can select the new External Loader to ac
 </ul>
 
 ## "How to" add External Loader to STM32CubeIDE
+<ul>
+<li>
+Go to the STM32Cubeide program folder<br> 
+(right-click the program icon and choose "open file location")
+<li>
+once in the STM32CubeProgrammer program folder go subfolder:
+<i>./plugins/xxxxxx.externaltools.cubeprogrammer.xxxxx/tools/bin/ExternalLoader</i><br>
+
+<li>
+copy here the External Loader created (.stldr file)<br><br>
+Opening STM32CubeProgrammer program you can select the new External Loader to access the external flash memory.
+</ul>
 <br>
-see inside page "How to setup a TouchGFX project mapping an external flash memory"
-and "How to setup an STM32CubeIDE project mapping an external flash memory"
+Copy here the new .stldr file<br><br>
+Now the External Loader is available to CubeIDE and can be selected in "Run/Debug Settings"<br>
 <br>
 <br>
 <br>
@@ -159,23 +169,22 @@ Lo stesso plugin puo' essere utilizzato in STM32CubeIDE per programmare la memor
 
 ## "How to" come creare an External Loader relativo ad un progetto:
 <ul>
-Ipotizzando che hai gia' creato la configurazione del progetto di memoria esterna (es. hai già definito il modo di comunicazione QuadSPI...)<br><br>
+Dopo aver definito i dettagli di configurazione CubeMX del tuo progetto con una memoria flash via QuadSPI (ad esempio avendo già definito  il QuadSPI mode, e gli altri dettagli necessari per la gestione della memoria Flash<br><br>
 <li><b>Crea un nuovo progetto in CubeIDE</b>.<br>
 Assegna al progetto un nome con questa forma:<br> 
 "external flash in uso"_"nome uC o board in uso"_"eventuali altre informazioni - es. Porta QuadSPI, mode, bank, ecc."<br>
 (il carattere "_" separa i tre campi e non deve essere utilizzato nel nome se non per questa separazione)<br>
 Esempi di nomi di progetto protrebbero essere:
 <ul>
-W25Q80_STM32H750_QSPI-BANK11<br>
+W25Q80_STM32H750_QSPI-BANK1<br>
 W25Q80_WEACT-H750 (il terzo campo è opzionale e qui non c'e')<br>
-W25Q64_NUCLEO32-L432_SPI1-PA4CS<br>
 ecc.<br>
 </ul>
 <li><b>in CubeMX</b>:
 <ul>
-<li> configura una porta <b>SPI</b> ed il pin <b>CS</b> per la memoria flash (vedi sopra il dettaglio per la configurazione CubeMX)<br>
+<li> configura una porta <b>QuadSPI</b> per la memoria flash, seguendo il tuo progetto<br>
 <i><b>Attenzione:</b><br>
-se usato in prototipazione, per External Loader e' consigliabile configurare una velocià inferiore a 2Mbit/s</i><br>
+E' sempre consigliabile configurare una velocià ridotta (es. inferiore a 2Mbit/s)<br>
 <li> abilita <b>CRC</b> (devi solo spuntare "Activated")<br>
 <li> Se hai un led a disposizione sulla scheda, puoi usarlo nell'External Loader (utile nel troubleshooting)<br>
 dai al pin del led il nome: <b>LED</b> 
@@ -187,13 +196,13 @@ dai al pin del led il nome: <b>LED</b>
 <li>
 copiare in <i><b>include</b></i> folder
 <ul>
-z_flash_W25QXXX.h<br>
+z_qflash_W25QXXX.h<br>
 Dev_Inf.h<br>
 </ul>
 <li>
 copiare in <i><b>src</b></i> folder
 <ul>
-z_flash_W25QXXX.c<br>
+z_qflash_W25QXXX.c<br>
 Dev_Inf.c<br>
 Loader_Src.c<br>
 </ul>
@@ -204,7 +213,7 @@ EL_linker.ld<br>
 Post-Build command.txt<br>
 </ul>
 <li>
-definire i parametri in <i>"<b>z_flash_W25QXXX.h</b>"</i>
+definire i parametri in <i>"<b>z_qflash_W25QXXX.h</b>"</i>
 <ul>
 definire le caratteristiche della memoria (vedi piu' sopra la configurazione di <i>"z_flash_W25QXXX.h"</i> da Step 1 a 4)
 </ul>
@@ -231,8 +240,8 @@ scegliere "Apply and Close"
 modificare <i><b>EL_linker.ld</b></i> 
 <ul>
 <li>
-modificare la dimensione della memoria indicando la RAM disponibile sul uC:<br>
-alla riga 30 trovi il testo:<br>
+modificare origine e dimensione della memoria indicando la RAM disponibile sul uC:<br>
+attorno alla riga 30 trovi il testo:<br>
 	
 ```sh
 (EL_linker.ld)
@@ -241,15 +250,15 @@ RAM_LOADER (xrw)      : ORIGIN = 0x20000004, LENGTH = 8M-4
 ...
 ```
 <br>
-modifica il valore "8M" dopo "LENGTH =" specificando la dimensione della RAM del uC
+cambia il valore "0x20000004" in "0x24000004" se il uC in uso è un H7<br>
+modifica il valore "8M" dopo "LENGTH =" specificando la dimensione della RAM (fai riferimento al file .ld attualmente attivo per la corretta informazione sulla configurazione RAM del uC in uso)<br>
 <li>
-salvare
+salvare il tutto
 <li>
 in <i><b>project->properties->C/C++ Build->settings->Tool Setting->MCU GCC Linker->General->linker script</b></i>:
 <ul>
 1	cambiare il nome del file .ld in "EL_linker.ld": dovrebbe essere: ${workspace_loc:/${ProjName}/EL_linker.ld}<br>
-2	togliere flag da <i>Discard Unused Sections</i><br>
-3	cliccare "Apply and Close"<br>
+2	cliccare "Apply and Close"<br>
 </ul>
 </ul>
 </ul>
@@ -257,11 +266,8 @@ in <i><b>project->properties->C/C++ Build->settings->Tool Setting->MCU GCC Linke
 <br>
 
 
-
-
-
 > <br><em><b>NOTA BENE:</b><br> Non hai bisogno di deselezionare il flag <i><b>Discard Unused Sections</b></i> in Project->Properties, come indicato nel mio video "[Prima Parte](https://youtu.be/KlG2doCkREM)".<br>
-> Le caratteristiche e le necessità di questa libreria sono descritte in "[Terza Seconda](.)".<br>
+> Le caratteristiche e le necessità di questa libreria sono descritte in "[Terza Seconda](https://youtu.be/zv0w_vhTTTo)".<br>
 
 <br>
 
@@ -282,9 +288,21 @@ Aprendo STM32CubeProgrammer si puo' selezionare il nuovo External Loader per acc
 
 
 ## "How to" add External Loader to STM32CubeIDE
+<ul>
+<li>
+Andare nel folder del programma STM32CubeIDE<br> 
+(ad esempio click-destro del mouse sull'icona del programma e scegliere "Apri percorso file")
+<li>
+Raggiunta la cartella di STM32CubeIDE, andare nella sottocartella:
+<i>./plugins/xxxxxx.externaltools.cubeprogrammer.xxxxx/tools/bin/ExternalLoader</i><br>
+<li>
+Copiare qui il file .stldr creato<br><br>
+Ora l'External Loader è disponibile in CubeIDE e puo' essere selezionato in "Run/Debug Settings"<br>
+</ul>
+
 <br>
-Vedi la pagina ""How to: come aggiungere un  External Loader a STM32CubeProgrammer"
-e ""How to: configurare un progetto STM32CubeIDE mappando una memoria flash esterna"
+Vedi la pagina "How to: come aggiungere un  External Loader a STM32CubeProgrammer"
+e "How to: configurare un progetto STM32CubeIDE mappando una memoria flash esterna"
 <br><i><b>
 <br>
 
