@@ -62,13 +62,17 @@ modify <i>/* USER CODE BEGIN Includes */</i> segment, adding the flash library i
 /* USER CODE END Includes */
 ...
 ```
+
 <br>
+</ul>
+</ul>
+</ul>
 <ul>
-<b>Edit the linker script</b> (<xxxxxxxx_FLASH.ld</b> file):<br>
+Edit the linker script (<b>xxxxxxxx_FLASH.ld</b> file):<br>
 <ul>
-<li>open the linker script file and open also Program_linker_include.txt<br>
-<li>from this last file copy the row indicating flash size and address (starting with "SPI_FLASH...")<br> 
-<li>in the linker script, in the "<b>Memories definition</b>" area, paste the copied row, obtaining something like this:<br>  
+Open the linker script file and open also Program_linker_include.txt.<br>
+From this last file copy the row indicating flash size and address (starting with "SPI_FLASH...").<br> 
+In the linker script, in the "<b>Memories definition</b>" area, paste the copied row, obtaining something like this:<br>  
 
 ```sh
 (xxxxxxFLASH.ld)
@@ -84,12 +88,11 @@ MEMORY
 ```
 <br>
 	
-<li><b>Do not modify</b> RAM configuration,FLASH one or anyother memory area defined and handled by CubeMX<br>
-<li>Change "LENGTH" field <b>of QSPI_FLASH</b> indicating the size of flash memory you are using<br>
-<li>"ORIGIN" field of QSPI_FLASH <b>must be the same value</b> registred in CubeMX TouchGFX configuration<br> 
+<b>Do not modify</b> RAM configuration,FLASH one or anyother memory area defined and handled by CubeMX.<br>
+Change "LENGTH" field <b>of QSPI_FLASH</b> indicating the size of flash memory you are using.<br>
+"ORIGIN" field of QSPI_FLASH <b>must be the same value</b> registred in CubeMX TouchGFX configuration.<br> 
 
-</ul>
-from Program_linker_include.txt file copy rows of the <b>ExtFlashSection</b><br>
+From Program_linker_include.txt file copy rows of the <b>ExtFlashSection</b><br>
 
 ```sh
 (Program_linker_include.txt)
@@ -103,7 +106,6 @@ from Program_linker_include.txt file copy rows of the <b>ExtFlashSection</b><br>
 ...
 ```
 
-<ul>
 and paste them at the beginning of the SECTIONS area of the linker script. This way:<br>
 
 ```sh
@@ -121,10 +123,9 @@ SECTIONS
   } >QSPI_FLASH
 ...
 ```
-<ul>
-this will allow to move selected images to the external flash memory.
 
-if you want/need to move also fonts to the external memory copy also the  <b>FontFlashSection</b> from Program_linker_include.txt and paste into linker file this way:
+This will allow to move selected images to the external flash memory.<br>
+If you want/need to move also fonts to the external memory copy also the  <b>FontFlashSection</b> from Program_linker_include.txt and paste into linker file this way:<br>
 
 ```sh
 (xxxxxxFLASH.ld)
@@ -149,7 +150,8 @@ SECTIONS
 
 ...
 ```
-<br>
+</ul>
+</ul>
 
 <li><b>on TouchGFX Designer</b>:<br>
 <br>
@@ -170,13 +172,6 @@ From now on, when you are in <b>TouchGFX Designer</b>, you can move single pictu
 <br>
 
 ---
->
-> <i><b>WARNING</b></i>
-> </b>
-> External SPI flash memory is MUCH slower than uC internal flash.<br> 
-> Consider to move to the flash what you really need due to the limit of the uC internal flash
-
----
 
 <br>
 <li> add the external loader to CubeIDE
@@ -191,7 +186,7 @@ once in the STM32CubeIDE program folder go to:
 <i>bin</i> folder<br>
 <i>ExternalLoader</i> folder<br>
 </ul>
-here copy the external loader you previously made following above instructions<br>
+copy here the external loader you previously made following above instructions<br>
 </ul>
 <li>configure CubeIDE to use the external loader<br>
 <ul>
@@ -199,7 +194,7 @@ in CubeIDE go to Project->Properties->Run/Debug Settings<br>
 select the settings file and click "Edit"<br>
 go to "Debugger"<br>
 scroll to "External Loaders" and click "Add"<br>
-select, in the external loader list, the external loader to use.
+select, in the external loader list, the external loader to use.<br>
 Click "OK" and "Apply" until you close all the "properties" windows open.
 	
 </ul>	
@@ -277,12 +272,15 @@ modificare il segmento <i>/* USER CODE BEGIN Includes */</i>, aggiungendo la "in
 ...
 ```
 <br>
+</ul>
+</ul>
+</ul>
 <ul>
 <b>Editare lo script per il linker</b> (file <xxxxxxxx_FLASH.ld</b>):<br>
 <ul>
-<li>aprire lo script per il linker e aprire anche Program_linker_include.txt<br>
-<li>da questo ultimo file copiare la riga che indica la misura e l'indirizzo della memoria flash (inizia con "SPI_FLASH...")<br> 
-<li>nello script linker, nell'area "<b>Memories definition</b>", incolla la riga copiata, ottenendo una struttura come questa:<br>  
+Aprire lo script per il linker e aprire anche Program_linker_include.txt.<br>
+Da questo ultimo file copiare la riga che indica la misura e l'indirizzo della memoria flash (inizia con "SPI_FLASH...").<br> 
+Nello script linker, nell'area "<b>Memories definition</b>", incolla la riga copiata, ottenendo una struttura come questa:<br>  
 
 ```sh
 (xxxxxxFLASH.ld)
@@ -298,12 +296,10 @@ MEMORY
 ```
 <br>
 	
-<li><b>Non modificare</b> la configurazione RAM, FLASH, o qualunque altra riga si trovi qui: definita e gestita da CubeMX<br>
-<li>Modificare il campo "LENGTH" <b>di QSPI_FLASH</b> indicando la dimensione della memoria flash in uso<br>
-<li>Il campo "ORIGIN" di QSPI_FLASH <b>deve avere lo stesso valore</b> registrato nella configurazione TouchGFX in CubeMX<br> 
-
-</ul>
-dal file Program_linker_include.txt copia le righe relative a <b>ExtFlashSection</b><br>
+<b>Non modificare</b> la configurazione RAM, FLASH, o qualunque altra riga si trovi qui: definita e gestita da CubeMX.<br>
+Modificare il campo "LENGTH" <b>di QSPI_FLASH</b> indicando la dimensione della memoria flash in uso.<br>
+Il campo "ORIGIN" di QSPI_FLASH <b>deve avere lo stesso valore</b> registrato nella configurazione TouchGFX in CubeMX.<br> 
+Dal file Program_linker_include.txt copia le righe relative a <b>ExtFlashSection</b>.<br>
 
 ```sh
 (Program_linker_include.txt)
@@ -317,7 +313,6 @@ dal file Program_linker_include.txt copia le righe relative a <b>ExtFlashSection
 ...
 ```
 
-<ul>
 ed incollale all'inizio dell'area SECTIONS dello script linker. In questo modo:<br>
 
 ```sh
@@ -335,10 +330,8 @@ SECTIONS
   } >QSPI_FLASH
 ...
 ```
-<ul>
-questo permette di spostare immagini selezionate verso la memoria flash esterna.
-
-Volendo/dovendo spostrare anche i fontverso la memoria flash esterna, copia anche la sezione <b>FontFlashSection</b> da Program_linker_include.txt ed incollala nello script linker in questo modo:
+Questo permette di spostare immagini selezionate verso la memoria flash esterna.<br>
+Volendo/dovendo spostrare anche i fontverso la memoria flash esterna, copia anche la sezione <b>FontFlashSection</b> da Program_linker_include.txt ed incollala nello script linker in questo modo:<br>
 
 ```sh
 (xxxxxxFLASH.ld)
@@ -363,7 +356,8 @@ SECTIONS
 
 ...
 ```
-<br>
+</ul>
+</ul>
 
 <li><b>on TouchGFX Designer</b>:<br>
 <br>
@@ -383,13 +377,6 @@ Se si spostano i font sulla memoria flash esterna <b>OCCORRE SEMPRE</b> impostar
 </ul>
 
 
-
----
->
-> <i><b>ATTENZIONE</b></i>
-> </b>
-> La memoria SPI flash esterna is MOLTO più lenta che la flash interna al uC.<br> 
-> Tenere in considerazione di spostare sulla flash esterna solo ciò che occorre veramente a causa dei limiti della flash interna al uC.
 
 ---
 
@@ -414,8 +401,8 @@ in CubeIDE andare in: Project->Properties->Run/Debug Settings<br>
 cliccare "Edit"<br>
 selezionare "Debugger"<br>
 sorrere la pagina fino a "External Loaders" e cliccare "Add"<br>
-Selezionare, Nella lista degli external loader, il modulo da usare.
-Cliccare "OK" and "Apply" chidendo la finestra "Properties" aperta.
+selezionare, nella lista degli external loader, il modulo da usare.<br>
+cliccare "OK" and "Apply" chidendo la finestra "Properties" aperta.
 	
 </ul>	
 <br>
