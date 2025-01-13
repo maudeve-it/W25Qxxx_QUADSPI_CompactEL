@@ -11,7 +11,7 @@
  * compile and run the project
  *
  *
-  uint8_t flashOK =1; test results
+  uint8_t flashOK =1; //test results
 
   TriggerLogicAnalyzer();
 
@@ -39,7 +39,7 @@
 
 #ifndef  FLASH_QSPI_MEMORY_MAPPED
 
-  if (FlashOK)
+  if (flashOK)
 	  flashOK=TimeTest();
 
 #endif
