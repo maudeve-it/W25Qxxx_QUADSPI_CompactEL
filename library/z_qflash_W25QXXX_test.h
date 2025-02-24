@@ -6,13 +6,15 @@
  *
  *
  *
+ * put below row in "USER CODE BEGIN PD" session of main.c
+ *
+  uint8_t flashOK =1; //test results
+ *
  *
  * put below rows in "USER CODE BEGIN 2" session of main.c
  * compile and run the project
  *
- *
-  uint8_t flashOK =1; //test results
-
+  HAL_TIM_Base_Start(&htim2);
   TriggerLogicAnalyzer();
 
   //initialization triggering Logic Analyzer (and led)
