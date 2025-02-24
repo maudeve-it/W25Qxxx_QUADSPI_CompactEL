@@ -1,4 +1,4 @@
-<img src="https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/COPERTINA%20QSPI.png" width="900" height="506">
+[<img src="https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/COPERTINA%20QSPI.png" width="450" height="253">](https://youtu.be/_ds4ABvxQY8) [<img src="https://github.com/maudeve-it/W25Qxxx_QUADSPI_CompactEL/blob/main/QSPI2.png" width="450" height="253">](https://youtu.be/XVVtDWfh4Ks)
 
 
 

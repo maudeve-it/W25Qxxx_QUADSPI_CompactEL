@@ -4,54 +4,18 @@
  *  Created on: Oct 10, 2024
  *      Author: mauro
  *
+ * A series of functions testing the various features of W25Q flash memory
+ * in a QuadSPI communication
  *
+ * TimeTest() preforms the Indirect Mode time detection analyzed on the 2 fideos about QSPI library
  *
- * put below row in "USER CODE BEGIN PD" session of main.c
+ * MMTest() preforms the MemoryMapped Mode time detection analyzed on the 2 fideos about QSPI library
  *
-  uint8_t flashOK =1; //test results
+ * PLEASE NOTE:
+ * before running the MMTest() function, set library in Indirect Mode and run one time the pre-MMTest() function
+ * than you can run MMTest() any times you like
  *
- *
- * put below rows in "USER CODE BEGIN 2" session of main.c
- * compile and run the project
- *
-  HAL_TIM_Base_Start(&htim2);
-  TriggerLogicAnalyzer();
 
-  //initialization triggering Logic Analyzer (and led)
-  HAL_Delay(DELAY_TIME*2);
-  HAL_GPIO_WritePin(TRIGGER_GPIO_Port,TRIGGER_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
-  if (QFlash_Init()!=HAL_OK) {
-	  flashOK =0;
-	  while (1) {}
-  }
-  HAL_GPIO_WritePin(TRIGGER_GPIO_Port,TRIGGER_Pin,GPIO_PIN_RESET);
-  HAL_Delay(DELAY_TIME);
-  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
-
-
-  // testing Chip Erase
-  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(TRIGGER_GPIO_Port,TRIGGER_Pin,GPIO_PIN_SET);
-  // if (FlashOK)
-  //     QFlash_ChipErase();
-  HAL_GPIO_WritePin(TRIGGER_GPIO_Port,TRIGGER_Pin,GPIO_PIN_RESET);
-  HAL_Delay(DELAY_TIME);
-  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
-
-#ifndef  FLASH_QSPI_MEMORY_MAPPED
-
-  if (flashOK)
-	  flashOK=TimeTest();
-
-#endif
-
- *
- *
- * Now put the below row into the main loop
- *
- *
- *
    BlinkIt(flashOK);  // a series of triple-blinking means test was good
  
  */
@@ -66,7 +30,8 @@ void BlinkIt(uint8_t flashOK);
 void TriggerLogicAnalyzer();
 void SimpleReadingTest();
 HAL_StatusTypeDef TestStatusRegisters(uint8_t level);
+uint8_t pre_MMTest();
 uint8_t TimeTest();
-
+uint8_t MMTest();
 
 #endif /* INC_Z_QFLASH_W25QXXX_TEST_H_ */

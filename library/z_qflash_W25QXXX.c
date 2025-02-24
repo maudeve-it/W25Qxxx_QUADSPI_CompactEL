@@ -15,18 +15,86 @@
 
 
 #include "main.h"
-#include "z_qflash_W25QXXX.h"
+
 
 extern QSPI_HandleTypeDef FLASH_QSPI_PORT;
 
+static volatile uint8_t QSpiAvailable=1;  			// 0 if QuadSPI is busy; 1 if it is free (operation cplt); -1 if transmission error
+static volatile uint8_t QSpiReadDataAvailable=1;  	// 0 if QuadSPI is busy; 1 if it is free (operation cplt); -1 if transmission error
 
 
-/**************************
+
+/***********************************************
+ * @BRIEF	It returns the status of the QSPI port
+ * @RETURN	1	QuadSPI port available
+ * 			0	QuadSPI port busy
+ ***********************************************/
+uint8_t QFlash_IsQSPIAvailable() {
+	return QSpiAvailable;
+}
+
+
+
+
+/***********************************************
+ * @BRIEF	Wait for a free QuadSPI port
+ * @PARAM	timeout		non 0 	= 	time limit for data
+ * 									transfer complete
+ * 						0 		= 	indefinite waiting
+ ***********************************************/
+HAL_StatusTypeDef QFlash_WaitForQSPIAvailable(uint32_t timeout) {
+	uint32_t curtime = HAL_GetTick();
+
+	while ((!QSpiAvailable) && ((timeout==0) || ((HAL_GetTick()-curtime)<=timeout))) {};
+	if (!QSpiAvailable)
+		return HAL_ERROR;
+	return HAL_OK;
+};
+
+
+
+
+
+/***********************************************
+ * @BRIEF	It returns the status of the QSPI
+ * 			receive command
+ * @RETURN	1	= data transmission completed:
+ * 				  data requested is available
+ * 			0	= data transmission still running
+ ***********************************************/
+uint8_t QFlash_IsDataAvailable() {
+	return QSpiReadDataAvailable;
+}
+
+
+
+/***********************************************
+ * @BRIEF	Wait for the completed data
+ * 			transfer (meaningless in polling
+ * 			mode
+ * @PARAM	timeout		non 0 	= 	time limit for data
+ * 									transfer complete
+ * 						0 		= 	indefinite waiting
+ ***********************************************/
+HAL_StatusTypeDef QFlash_WaitForDataAvailable(uint32_t timeout) {
+	uint32_t curtime = HAL_GetTick();
+
+	while ((!QSpiReadDataAvailable) && ((timeout==0) || ((HAL_GetTick()-curtime)<=timeout))) {};
+	if (!QSpiReadDataAvailable)
+		return HAL_ERROR;
+	return HAL_OK;
+};
+
+
+
+
+
+/************************************************
  * @BRIEF	Desault configuration
  * 			of the "sCommand" parameters set
  * 			for "HAL_QSPI_Command()"
  * @PARAM	SCommand	parameters set to setup
- **************************/
+ ************************************************/
 void QFlash_DefaultCmd(QSPI_CommandTypeDef *sCommand) {
 
     sCommand->InstructionMode = QFLASH_INSTRUCTION_MODE;
@@ -38,9 +106,53 @@ void QFlash_DefaultCmd(QSPI_CommandTypeDef *sCommand) {
     sCommand->DdrHoldHalfCycle = QFLASH_DDR_HOLD_HALF_CYCLE;
     sCommand->SIOOMode = QFLASH_SIOO_MODE;
     sCommand->DummyCycles = QFLASH_DUMMY_CYCLES;
+
     return;
 }
 
+
+
+
+
+
+/******************************************************************
+ * @BRIEF	Reset W25Q chip
+ ******************************************************************/
+HAL_StatusTypeDef QFlash_Reset() {
+	QSPI_CommandTypeDef sCommand = {0};
+
+	// send a "reset enable" command
+	QFlash_DefaultCmd(&sCommand);
+	sCommand.Instruction = W25_RESET_EN;
+	sCommand.AddressMode = QSPI_ADDRESS_NONE;
+	sCommand.DataMode = QSPI_DATA_NONE;
+
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	HAL_Delay(1);									// 30us needed by resetting
+
+	// send a "reset" command
+	QFlash_DefaultCmd(&sCommand);
+	sCommand.Instruction = W25_RESET;
+	sCommand.AddressMode = QSPI_ADDRESS_NONE;
+	sCommand.DataMode = QSPI_DATA_NONE;
+
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	HAL_Delay(1);									// 30us needed by resetting
+	return HAL_OK;
+
+}
 
 
 
@@ -58,7 +170,7 @@ void QFlash_DefaultCmd(QSPI_CommandTypeDef *sCommand) {
  * 		16H ->  32Mb		17H ->  64Mb		18H -> 128Mb
  * 		19H -> 256Mb		20H -> 512Mb		21H ->   1Gb
  ******************************************************************/
-HAL_StatusTypeDef QFlash_ReadJedecID(uint8_t *data) {
+HAL_StatusTypeDef QFlash_ReadJedecID(uint8_t *dataptr) {
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -69,13 +181,27 @@ QSPI_CommandTypeDef sCommand = {0};
     sCommand.NbData			= 3;
 	sCommand.DummyCycles 	= 0;
 
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
-		return HAL_ERROR;
-	}
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
     	return HAL_ERROR;
     }
-	return HAL_OK;
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+    return HAL_OK;
 }
 
 
@@ -84,7 +210,7 @@ QSPI_CommandTypeDef sCommand = {0};
 /*********************************
  * @RETURN	256byte SFDP register content:
  *********************************/
-HAL_StatusTypeDef QFlash_ReadSFDP(uint8_t* data) {
+HAL_StatusTypeDef QFlash_ReadSFDP(uint8_t* dataptr) {
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -96,12 +222,26 @@ QSPI_CommandTypeDef sCommand = {0};
     sCommand.NbData			= 256;
     sCommand.DummyCycles 	= 8;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0; 	//set data requested unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
-   	if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
-   	    return HAL_ERROR;
-   	}
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
 	return HAL_OK;
 }
 
@@ -115,35 +255,12 @@ QSPI_CommandTypeDef sCommand = {0};
  ******************************************************************/
 HAL_StatusTypeDef QFlash_Init(){
 uint8_t data[256];
-QSPI_CommandTypeDef sCommand = {0};
 
 	HAL_Delay(6);	// supposing init is called on system startup: 5 ms (tPUW) required after power-up to be fully available
 
-// send a "reset enable" command
-	QFlash_DefaultCmd(&sCommand);
-	sCommand.Instruction = W25_RESET_EN;
-	sCommand.AddressMode = QSPI_ADDRESS_NONE;
-	sCommand.DataMode = QSPI_DATA_NONE;
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-	   return HAL_ERROR;
-	}
-
-	HAL_Delay(1);									// 30us needed by resetting
-
-// send a "reset" command
-	QFlash_DefaultCmd(&sCommand);
-	sCommand.Instruction = W25_RESET;
-	sCommand.AddressMode = QSPI_ADDRESS_NONE;
-	sCommand.DataMode = QSPI_DATA_NONE;
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-	   return HAL_ERROR;
-	}
-
-	HAL_Delay(1);									// 30us needed by resetting
-
-//	if (CheckSR1()== HAL_ERROR){
-//		return HAL_ERROR;
-//	}
+// reset the device (supposing it is a W25Q)
+	if (QFlash_Reset()!=HAL_OK)
+		return HAL_ERROR;
 
 // testing if an SFPD device is connected and working
 	for (uint8_t k=0;k!=3;k++)
@@ -160,11 +277,12 @@ QSPI_CommandTypeDef sCommand = {0};
 	if (data[0] != 0xEF)  // if ManufacturerID is not Winbond (0xEF)
 		return HAL_ERROR;
 
+
 #ifdef FLASH_QSPI_MEMORY_MAPPED
-	if (QSPI_EnableMemoryMappedMode()==HAL_ERROR)
+// reset and tests are OK: enable memory mapped mode
+	if (QFlash_EnableMemoryMappedMode()==HAL_ERROR)
 		return HAL_ERROR;
 #endif //FLASH_QSPI_MEMORY_MAPPED
-
 
 	return HAL_OK;  //return memSize as per table in Flash_ReadJedecID() definition
 }
@@ -175,7 +293,7 @@ QSPI_CommandTypeDef sCommand = {0};
 #ifdef FLASH_QSPI_MEMORY_MAPPED
 
 
-HAL_StatusTypeDef QSPI_EnableMemoryMappedMode(void) {
+HAL_StatusTypeDef QFlash_EnableMemoryMappedMode(void) {
 	QSPI_CommandTypeDef sCommand = {0};
 	QSPI_MemoryMappedTypeDef sMemMappedCfg = {0};
 
@@ -187,15 +305,23 @@ HAL_StatusTypeDef QSPI_EnableMemoryMappedMode(void) {
     sCommand.AlternateBytesSize = QFLASH_ALT_BYTES_S;
     sCommand.AlternateByteMode  = QFLASH_ALT_BYTES_M;
 
-	// Set memory-mapped mode
+	// Set memory-mapped mode CS and prefetch handling:
+	// timeout disabled: prefetch and CS always active
 	sMemMappedCfg.TimeOutActivation = QSPI_TIMEOUT_COUNTER_DISABLE;
+/*
+	// Set memory-mapped mode CS and prefetch handling
+	// timeout enabled: prefetch and CS disabled after 4 SPI clock cycles
+	sMemMappedCfg.TimeOutActivation = QSPI_TIMEOUT_COUNTER_ENABLE;
+	sMemMappedCfg.TimeOutPeriod=4;
+*/
 
-	// go on
-	if (HAL_QSPI_MemoryMapped(&hqspi, &sCommand, &sMemMappedCfg) != HAL_OK) {
+
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+	if (HAL_QSPI_MemoryMapped(&FLASH_QSPI_PORT, &sCommand, &sMemMappedCfg) != HAL_OK) {
 		return HAL_ERROR;
 	}
-
-//	HAL_Delay(100);
 
 	return HAL_OK;
 }
@@ -228,12 +354,29 @@ QSPI_CommandTypeDef sCommand = {0};
     sCommand.AlternateBytesSize = QFLASH_ALT_BYTES_S;
     sCommand.AlternateByteMode  = QFLASH_ALT_BYTES_M;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, buffer, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, buffer) != HAL_OK) { // Receive data
     	return HAL_ERROR;
     }
+#ifdef FLASH_QSPI_WAIT_FOR_READING_COMPLETE
+    QFlash_WaitForDataAvailable(0);
+#endif //FLASH_QSPI_WAIT_FOR_READING_COMPLETED
+
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, buffer, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
 	return HAL_OK;
 }
 
@@ -249,6 +392,9 @@ QSPI_CommandTypeDef sCommand = {0};
 	sCommand.DataMode 		= QSPI_DATA_NONE;
 	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
 	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
 		return HAL_ERROR;
 	}
@@ -291,6 +437,9 @@ HAL_StatusTypeDef QFlash_WriteDisable(){
     sCommand.DataMode 		= QSPI_DATA_NONE;
     sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
@@ -303,11 +452,10 @@ HAL_StatusTypeDef QFlash_WriteDisable(){
 
 
 /**********************************
- * @BRIEF	read STATUS REGISTER 1
- * @RETURN
+ * @BRIEF	read 	STATUS REGISTER 1
+ * @PARAM	dataptr	points to a 1 byte registering the SR1 value
  *********************************/
-uint8_t QFlash_ReadSR1(){
-uint8_t data[2];
+HAL_StatusTypeDef QFlash_ReadSR1(uint8_t *dataptr){
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -316,17 +464,29 @@ QSPI_CommandTypeDef sCommand = {0};
 	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 	sCommand.AddressSize	= QSPI_ADDRESS_NONE;
 	sCommand.Address		= 0x0;
-    sCommand.NbData			= 2;
+    sCommand.NbData			= 1;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
-        return 0;
+        return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
-    	return 0;
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
     }
-    if (data[0]!=data[1])
-		__NOP();
-	return data[0];
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+    return HAL_OK;
 }
 
 
@@ -335,10 +495,10 @@ QSPI_CommandTypeDef sCommand = {0};
 
 /**********************************
  * @BRIEF	read STATUS REGISTER 2
- * @RETURN
+ * @PARAM	dataptr	points to a 1 byte registering the SR2 value
  *********************************/
-uint8_t QFlash_ReadSR2(){
-uint8_t data[10];
+HAL_StatusTypeDef QFlash_ReadSR2(uint8_t *dataptr){
+
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -347,15 +507,29 @@ QSPI_CommandTypeDef sCommand = {0};
 	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 	sCommand.AddressSize	= QSPI_ADDRESS_NONE;
 	sCommand.Address		= 0x0;
-    sCommand.NbData			= 10;
+    sCommand.NbData			= 1;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
-        return 0;
+        return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
-    	return 0;
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
     }
-	return data[0];
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	return HAL_OK;
 }
 
 
@@ -364,10 +538,9 @@ QSPI_CommandTypeDef sCommand = {0};
 
 /**********************************
  * @BRIEF	read STATUS REGISTER 3
- * @RETURN
+ * @PARAM	dataptr	points to a 1 byte registering the SR2 value
  *********************************/
-uint8_t QFlash_ReadSR3(){
-uint8_t data[10];
+HAL_StatusTypeDef QFlash_ReadSR3(uint8_t *dataptr){
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -376,15 +549,29 @@ QSPI_CommandTypeDef sCommand = {0};
 	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 	sCommand.AddressSize	= QSPI_ADDRESS_NONE;
 	sCommand.Address		= 0x0;
-    sCommand.NbData			= 10;
+    sCommand.NbData			= 1;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
-        return 0;
+        return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
-    	return 0;
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
     }
-	return data[0];
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	return HAL_OK;
 }
 
 
@@ -395,27 +582,39 @@ QSPI_CommandTypeDef sCommand = {0};
 HAL_StatusTypeDef  QFlash_WriteSR2(uint8_t data){
 	QSPI_CommandTypeDef sCommand = {0};
 
-		if (QFlash_WriteEnable())
-			return HAL_ERROR;
+	if (QFlash_WriteEnable())
+		return HAL_ERROR;
 
-		QFlash_DefaultCmd(&sCommand);
-		sCommand.Instruction	= W25_W_SR2;
-	    sCommand.DataMode 		= QSPI_DATA_1_LINE;
-		sCommand.AddressMode	= QSPI_ADDRESS_NONE;
-		sCommand.AddressSize	= QSPI_ADDRESS_NONE;
-		sCommand.Address		= 0x0;
-		sCommand.NbData			= 1;
+	QFlash_DefaultCmd(&sCommand);
+	sCommand.Instruction	= W25_W_SR2;
+	sCommand.DataMode 		= QSPI_DATA_1_LINE;
+	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
+	sCommand.AddressSize	= QSPI_ADDRESS_NONE;
+	sCommand.Address		= 0x0;
+	sCommand.NbData			= 1;
 
-		if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-	        return HAL_ERROR;
-	    }
-	    if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, &data, QFLASH_DEF_TIMEOUT) != HAL_OK) { 	//Send data
-	        return HAL_ERROR;
-	    }
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	if (HAL_QSPI_Transmit_DMA(&FLASH_QSPI_PORT, &data) != HAL_OK) { // Receive data
+		return HAL_ERROR;
+	}
+#else
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, &data, QFLASH_DEF_TIMEOUT) != HAL_OK) {
+		return HAL_ERROR;
+	}
+#endif //EXT_FLASH_QSPI_DMA_MODE
 
-		QFlash_WaitForWritingComplete();
+	QFlash_WaitForWritingComplete();
 
-		return HAL_OK;
+	return HAL_OK;
 }
 
 
@@ -425,27 +624,39 @@ HAL_StatusTypeDef  QFlash_WriteSR2(uint8_t data){
 HAL_StatusTypeDef  QFlash_WriteSR3(uint8_t data){
 	QSPI_CommandTypeDef sCommand = {0};
 
-		if (QFlash_WriteEnable())
-			return HAL_ERROR;
+	if (QFlash_WriteEnable())
+		return HAL_ERROR;
 
-		QFlash_DefaultCmd(&sCommand);
-		sCommand.Instruction	= W25_W_SR3;
-	    sCommand.DataMode 		= QSPI_DATA_1_LINE;
-		sCommand.AddressMode	= QSPI_ADDRESS_NONE;
-		sCommand.AddressSize	= QSPI_ADDRESS_NONE;
-		sCommand.Address		= 0x0;
-		sCommand.NbData			= 1;
+	QFlash_DefaultCmd(&sCommand);
+	sCommand.Instruction	= W25_W_SR3;
+	sCommand.DataMode 		= QSPI_DATA_1_LINE;
+	sCommand.AddressMode	= QSPI_ADDRESS_NONE;
+	sCommand.AddressSize	= QSPI_ADDRESS_NONE;
+	sCommand.Address		= 0x0;
+	sCommand.NbData			= 1;
 
-		if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-	        return HAL_ERROR;
-	    }
-	    if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, &data, QFLASH_DEF_TIMEOUT) != HAL_OK) { 	//Send data
-	        return HAL_ERROR;
-	    }
+#ifdef EXT_FLASH_QSPI_QDMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	if (HAL_QSPI_Transmit_DMA(&FLASH_QSPI_PORT, &data) != HAL_OK) { // Receive data
+		return HAL_ERROR;
+	}
+#else
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+		return HAL_ERROR;
+	}
+	if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, &data, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+		return HAL_ERROR;
+	}
+#endif //EXT_FLASH_QSPI_DMA_MODE
 
-		QFlash_WaitForWritingComplete();
+	QFlash_WaitForWritingComplete();
 
-		return HAL_OK;
+	return HAL_OK;
 }
 
 
@@ -456,14 +667,14 @@ HAL_StatusTypeDef  QFlash_WriteSR3(uint8_t data){
 /*********************************
  * just a funcion testing Status
  * Register 1 reading
- * verifies flash is not busy and
+ * It verifies flash is not busy and
  * not write-enabled
  *********************************/
-HAL_StatusTypeDef CheckSR1() {
+HAL_StatusTypeDef QFlash_CheckSR1() {
 	HAL_StatusTypeDef result = HAL_OK;
 	uint8_t sr;
 
-	sr=QFlash_ReadSR1();
+	QFlash_ReadSR1(&sr);
 
 //bitwise test of the SR1 content
 	if (!((sr & 1)==0)) {  //why flash is busy? It shouldn't
@@ -471,7 +682,7 @@ HAL_StatusTypeDef CheckSR1() {
 	} else if (!((sr & 2)==0)) {  //if write_enabled, disable it
 		QFlash_WriteDisable();
 		HAL_Delay(1);
-		sr=QFlash_ReadSR1();
+		QFlash_ReadSR1(&sr);
 		if (!((sr & 2)==0)){ //why flash is still writeable? It shouldn't
 			result=HAL_ERROR;
 		}
@@ -516,6 +727,10 @@ QFlash_DefaultCmd(&sCommand);
     sConfig.Interval = 0x10;
     sConfig.AutomaticStop = QSPI_AUTOMATIC_STOP_ENABLE;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
     if (HAL_QSPI_AutoPolling(&FLASH_QSPI_PORT, &sCommand, &sConfig, QFLASH_BSY_TIMEOUT) != HAL_OK) {
         return HAL_ERROR;
     }
@@ -556,7 +771,7 @@ QFlash_DefaultCmd(&sCommand);
  *  		data		buffer containing data to write into EEPROM
  * 			dataSize	number of bytes to write
  ***********************************************************************/
-HAL_StatusTypeDef QFlash_WriteASinglePage(uint32_t addr, uint8_t* data, uint16_t dataSize){
+HAL_StatusTypeDef QFlash_WriteASinglePage(uint32_t addr, uint8_t* dataptr, uint16_t dataSize){
 	QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -569,12 +784,24 @@ HAL_StatusTypeDef QFlash_WriteASinglePage(uint32_t addr, uint8_t* data, uint16_t
 	sCommand.NbData			= dataSize;
 	sCommand.Address		= addr;
 
-    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
-    if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, data, QFLASH_DEF_TIMEOUT) != HAL_OK) { 	//Send data
+    if (HAL_QSPI_Transmit_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
+    if (HAL_QSPI_Transmit(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
 	return HAL_OK;
 }
 
@@ -610,7 +837,6 @@ uint32_t inpage_addr;
 
 		if (QFlash_WriteEnable())
 			return HAL_ERROR;
-//		if (QFlash_WriteASinglePage(addr+quota,data+quota,dataSize-quota))
 		if (QFlash_WriteASinglePage(addr+quota,data+quota,EXT_FLASH_PAGE_SIZE-inpage_addr))
 			return HAL_ERROR;
 
@@ -620,8 +846,8 @@ uint32_t inpage_addr;
 		inpage_addr=0;
 		QFlash_WaitForWritingComplete();
 	}
-	// now just the final Flash page...
-	if (dataSize-quota) {
+							// now just write the last Flash page...
+	if (dataSize-quota) {	// ... if any
 
 		if (QFlash_WriteEnable())
 			return HAL_ERROR;
@@ -657,10 +883,13 @@ HAL_StatusTypeDef  QFlash_SErase4k(uint32_t addr){
 	sCommand.NbData 		= 0;
 	sCommand.Address 		= addr;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
 
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-		return HAL_ERROR;
-	}
 	if (QFlash_WaitForWritingComplete())
 		return HAL_ERROR;
 	return HAL_OK;
@@ -691,11 +920,15 @@ HAL_StatusTypeDef  QFlash_BErase32k(uint32_t addr){
 	sCommand.NbData 		= 0;
 	sCommand.Address 		= addr;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
 
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-		return HAL_ERROR;
-	}
-	if (QFlash_WaitForWritingComplete())
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+
+    if (QFlash_WaitForWritingComplete())
 		return HAL_ERROR;
 	return HAL_OK;
 }
@@ -726,10 +959,14 @@ HAL_StatusTypeDef QFlash_BErase64k(uint32_t addr){
 	sCommand.NbData 		= 0;
 	sCommand.Address 		= addr;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
 
-	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {		//Send command
-		return HAL_ERROR;
-	}
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+
 	if (QFlash_WaitForWritingComplete())
 		return HAL_ERROR;
 	return HAL_OK;
@@ -756,6 +993,10 @@ HAL_StatusTypeDef QFlash_ChipErase(){
 	sCommand.Instruction	= W25_CH_ERASE;
     sCommand.DataMode 		= QSPI_DATA_NONE;
     sCommand.AddressMode	= QSPI_ADDRESS_NONE;
+
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
 
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
@@ -785,9 +1026,14 @@ HAL_StatusTypeDef QFlash_PowerDown(){
     sCommand.DataMode 		= QSPI_DATA_NONE;
     sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 
-    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
+
     return HAL_OK;
 }
 
@@ -810,9 +1056,14 @@ HAL_StatusTypeDef QFlash_PowerUp(){
     sCommand.DataMode 		= QSPI_DATA_NONE;
     sCommand.AddressMode	= QSPI_ADDRESS_NONE;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
+
     return HAL_OK;
 }
 
@@ -821,10 +1072,9 @@ HAL_StatusTypeDef QFlash_PowerUp(){
 
 /**********************************
  * @BRIEF	read device id from chip
- * @RETURN	device id
+ * @PARAM	dataptr	receives Device ID
  *********************************/
-uint8_t QFlash_ReadDevID(){
-uint8_t data;
+HAL_StatusTypeDef QFlash_ReadDevID(uint8_t *dataptr){
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -836,21 +1086,34 @@ QSPI_CommandTypeDef sCommand = {0};
     sCommand.NbData			= 1; //after 3 dummy bytes I can read the Device ID
     sCommand.DummyCycles 	= 0;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
-        return 0;
+        return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, &data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
-    	return 0;
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, dataptr) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
     }
-	return data;
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	return HAL_OK;
 }
 
 
 
 
 
-uint16_t QFlash_ReadManufactutrerAndDevID() {
-uint16_t data=0;
+HAL_StatusTypeDef QFlash_ReadManufactutrerAndDevID(uint16_t *dataptr) {
 QSPI_CommandTypeDef sCommand = {0};
 
 	QFlash_DefaultCmd(&sCommand);
@@ -862,13 +1125,27 @@ QSPI_CommandTypeDef sCommand = {0};
     sCommand.NbData			= 2; //after 3 dummy bytes I can read the Device ID
     sCommand.DummyCycles 	= 0;
 
+#ifdef EXT_FLASH_QSPI_DMA_MODE
+	while (!QSpiAvailable) {};  // waiting for a free QSPI port.
+	QSpiAvailable=0;			//set QSPI busy
+	QSpiReadDataAvailable=0;	//set data read unavailable yet
     if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
         return HAL_ERROR;
     }
-    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT,(uint8_t *) &data, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) { // Receive data
+    if (HAL_QSPI_Receive_DMA(&FLASH_QSPI_PORT, (uint8_t *) dataptr) != HAL_OK) { // Receive data
     	return HAL_ERROR;
     }
-	return data;
+	QFlash_WaitForDataAvailable(0);
+#else
+    if (HAL_QSPI_Command(&FLASH_QSPI_PORT, &sCommand, QFLASH_DEF_TIMEOUT) != HAL_OK) {  //Send command
+        return HAL_ERROR;
+    }
+    if (HAL_QSPI_Receive(&FLASH_QSPI_PORT, (uint8_t *) dataptr, QFLASH_DEF_TIMEOUT) != HAL_OK) { // Receive data
+    	return HAL_ERROR;
+    }
+#endif //EXT_FLASH_QSPI_DMA_MODE
+
+	return HAL_OK;
 }
 
 
@@ -906,7 +1183,74 @@ void DataReader_StartDMAReadData(uint32_t address24, uint8_t* buffer, uint32_t l
 }
 
 
+void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *l_hqspi) {
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set QuadSPI port available flag
+	}
+}
 
 
+void HAL_QSPI_RxCpltCallback (QSPI_HandleTypeDef *l_hqspi){
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set QuadSPI port available
+		QSpiReadDataAvailable=1; 	//set data requested available flag
+	}
+}
 
+
+void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *l_hqspi) {
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set QuadSPI port available flag
+	}
+}
+
+
+/************************************************************
+ * @BRIEF	set to -1 global QSPI port availability flag
+ * 			in case of reading data, set to -1 even
+ * 			the Data availability flag
+ ************************************************************/
+void HAL_QSPI_ErrorCallback(QSPI_HandleTypeDef *l_hqspi){
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=-1;				//set QuadSPI port error
+		if (!QSpiReadDataAvailable)		//if a data reading is running
+			QSpiReadDataAvailable=-1; 	//notify the data reading failed
+	}
+}
+
+
+void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *l_hqspi) {
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set the QuadSPI port available flag
+	}
+}
+
+
+void HAL_QSPI_RxCpltCallback (QSPI_HandleTypeDef *l_hqspi){
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set the QuadSPI port available flag
+		QSpiReadDataAvailable=1; 	//set the data requested available flag
+	}
+}
+
+
+void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *l_hqspi) {
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=1;			//set QuadSPI port available flag
+	}
+}
+
+
+/************************************************************
+ * @BRIEF	set to -1 global QSPI port availability flag
+ * 			in case of reading data, set to -1 even
+ * 			the Data availability flag
+ ************************************************************/
+void HAL_QSPI_ErrorCallback(QSPI_HandleTypeDef *l_hqspi){
+	if (l_hqspi==&FLASH_QSPI_PORT) {
+		QSpiAvailable=-1;				//set the QuadSPI port available flag (error)
+		if (!QSpiReadDataAvailable)		//if a data reading is running
+			QSpiReadDataAvailable=-1; 	//notify the data reading failed
+	}
+}
 

@@ -20,49 +20,72 @@
 
 /*||||||||||| USER/PROJECT PARAMETERS |||||||||||*/
 
-/******************    STEP 0    ******************
+/******************    STEP 1    ******************
  **************** PORT PARAMETERS *****************
  **** properly set the below define to address ****
- *******  the SPI port confiugred on CubeMX *******
+ *******  the SPI port configured on CubeMX *******
  **************************************************/
 #define FLASH_QSPI_PORT 	hqspi
 
 
 
-/******************    STEP 1    ******************
- **************** FLASH ACCESS MODE ***************
- *** if accessing flash in mapping mode remove ****
- ********** comment to the below defined **********
- ************ if usind QSPI port in  **************
- *********** standard "indirect mode" *************
- ********* keep below #define commented ***********
- **************************************************/
-//#define FLASH_QSPI_MEMORY_MAPPED
-
-
-/******************    STEP 2    *******************
- **************** FLASH READING MODE ***************
- **** FLASH_MODE_1	->	SPI mode
- **** FLASH_MODE_2	->	Dual mode
- **** FLASH_MODE_4	->	Quad mode
- **** QSPI port must be previously correctly defined via CubeMX
- **************************************************/
-#define FLASH_QMODE_1
-//#define FLASH_QMODE_2
-//#define FLASH_QMODE_4
-
-
-/*****************     STEP 3      *****************
+/*****************     STEP 2      *****************
  ************* QSPI COMMUNICATION MODE *************
  ***** enable QSPI mode, uncommenting ONE row ******
  **** (Setup the same configuration on CubeMX) *****
  ***************************************************/
-#define EXT_FLASH_SPI_POLLING_MODE
-//#define EXT_FLASH_SPI_DMA_MODE // (mixed: polling/DMA, see below) NOT IMPLEMENTED
+#define EXT_FLASH_QSPI_POLLING_MODE
+//#define EXT_FLASH_QSPI_DMA_MODE
 
 
 
-/*****************     STEP 4      *****************
+/*****************     STEP 3      *****************
+ ***** READING FUNCTION BEHAVIOUR IN DMA MODE ******
+ * Only for DMA mode, meaningless in polling mode **
+ ** Only in indirect mode, meaningless in MM mode **
+ ***************************************************
+ *** If QFlash_Read() must return after the WHOLE **
+ *** incoming data transfer completes: uncomment ***
+ **** the below #define. If it must return just ****
+ ***** after the command IS SENT to flash, let *****
+ * the macro commented and use the related enquiry *
+ *** library functions (QFlash_IsDataAvailable(), **
+ ** QFlash_WaitForDataAvailable()) to detect the ***
+ ************ availability of data read ************
+ ***************************************************/
+//#define FLASH_QSPI_WAIT_FOR_READING_COMPLETE
+
+
+/******************    STEP 4    ******************
+ **************** FLASH ACCESS MODE ***************
+ **************************************************
+ *** MEMORY MAPPED mode: remove comment to the ****
+ *********************** below #define ************
+ ******** INDIRECT mode: keep comment to #define **
+ **************************************************/
+//#define FLASH_QSPI_MEMORY_MAPPED
+
+
+
+/******************    STEP 5    *******************
+ **************** FLASH READING MODE ***************
+ *** Library can communicate to W25Q flash memory **
+ ***** using the below three instructions sets *****
+ *** available. Depending on the PCB/wiring, set ***
+ ******* CubeMX configuratione and the below *******
+ ***************** instruction set. ****************
+ ***************************************************
+ **** FLASH_MODE_1	->	SPI mode
+ **** FLASH_MODE_2	->	Dual mode
+ **** FLASH_MODE_4	->	Quad mode
+ **************************************************/
+//#define FLASH_QMODE_1
+//#define FLASH_QMODE_2
+#define FLASH_QMODE_4
+
+
+
+/*****************     STEP 6      *****************
  *********** set below information as per *************
  ********* chip memory used in the project *********
  ***************************************************
@@ -121,13 +144,17 @@
 #define EXT_FLASH_BLOCK_NUM		0x0100		//256		blocks
 */
 
+/*|||||||| END OF USER/PROJECT PARAMETERS ||||||||*/
 
 
 
-/****************     STEP 5      ******************
- ********** set below information as per ***********
- ********** QSPI configuration needed by  **********
- *************** flash memory chip  ****************
+/*|||||||||||||| LIBRARY PARAMETERS ||||||||||||||*/
+
+/***************************************************
+ ********* below information set behaviour *********
+ ****** of QSPI in the various configurations  *****
+ ******* (eg. read command to use in single, *******
+ ************* dual, quad mode, etc.) **************
  ***************************************************/
 
 //default configuration
@@ -185,11 +212,7 @@
 #define QFLASH_WDATA_MODE			QSPI_DATA_4_LINES
 #endif
 
-
-
-#define EXT_FLASH_DMA_CUTOFF	20			//that's related to uC DMA and SPI. You can leave it unchanged
-
-/*|||||||| END OF USER/PROJECT PARAMETERS ||||||||*/
+/*|||||||||||| END OF LIBRARY PARAMETERS |||!!||||||||*/
 
 
 
@@ -271,14 +294,12 @@
 #define SR3_BIT_DRV1		(40U)  //writable: sets output driver strength
  end of W25QXX SR1, SR2, SR3 registers bitmasks */
 
-
 /*||||||||||| END OF DEVICE PARAMETERS ||||||||||||*/
 
 
 
 
 /*||||||||||| DEFINITIONS FOR E.L. GENERATION ||||||||||||*/
-
 
 #ifndef HAL_MAX_DELAY		// if there is no the uc HAL definition (building an E.L.
 
@@ -302,17 +323,22 @@ typedef enum
 
 
 
+HAL_StatusTypeDef 	QFlash_Reset();
 HAL_StatusTypeDef	QFlash_Init();
+uint8_t 			QFlash_IsQSPIAvailable();
+HAL_StatusTypeDef 	QFlash_WaitForQSPIAvailable(uint32_t timeout);
+uint8_t 			QFlash_IsDataAvailable();
+HAL_StatusTypeDef 	QFlash_WaitForDataAvailable(uint32_t timeout);
 
 #ifdef FLASH_QSPI_MEMORY_MAPPED
 
 #define ON_EXT_FLASH __attribute__((section("ExtFlashSection"))) __attribute__((aligned(4)))
-HAL_StatusTypeDef 	QSPI_EnableMemoryMappedMode(void);
+HAL_StatusTypeDef 	QFlash_EnableMemoryMappedMode(void);
 
 #else
 
-uint8_t  			QFlash_ReadDevID();
-uint16_t 			QFlash_ReadManufactutrerAndDevID();
+HAL_StatusTypeDef 	QFlash_ReadDevID(uint8_t *dataptr);
+HAL_StatusTypeDef 	QFlash_ReadManufactutrerAndDevID(uint16_t *dataptr);
 HAL_StatusTypeDef	QFlash_ReadJedecID(uint8_t *data);
 HAL_StatusTypeDef	QFlash_ReadSFDP(uint8_t* data);
 
@@ -322,6 +348,7 @@ HAL_StatusTypeDef	QFlash_BErase32k(uint32_t addr);
 HAL_StatusTypeDef	QFlash_BErase64k(uint32_t addr);
 
 HAL_StatusTypeDef	QFlash_Read(uint32_t address,  uint8_t* buffer, uint32_t dataSize);
+HAL_StatusTypeDef 	QFlash_WaitForDataAvailable(uint32_t timeout);
 HAL_StatusTypeDef	QFlash_Write(uint32_t addr, uint8_t* data, uint32_t dataSize);
 HAL_StatusTypeDef	QFlash_WaitForWritingComplete();
 HAL_StatusTypeDef	QFlash_WriteEnable();
@@ -329,9 +356,10 @@ HAL_StatusTypeDef 	QFlash_VolatileWriteEnable();
 HAL_StatusTypeDef	QFlash_WriteDisable();
 HAL_StatusTypeDef	QFlash_PowerUp();
 HAL_StatusTypeDef	QFlash_PowerDown();
-uint8_t 			QFlash_ReadSR1();
-uint8_t 			QFlash_ReadSR2();
-uint8_t 			QFlash_ReadSR3();
+HAL_StatusTypeDef 	QFlash_ReadSR1(uint8_t *dataptr);
+HAL_StatusTypeDef 	QFlash_ReadSR2(uint8_t *dataptr);
+HAL_StatusTypeDef 	QFlash_ReadSR3(uint8_t *dataptr);
+HAL_StatusTypeDef 	QFlash_CheckSR1();
 HAL_StatusTypeDef  	QFlash_WriteSR2(uint8_t data);
 HAL_StatusTypeDef  	QFlash_WriteSR3(uint8_t data);
 
